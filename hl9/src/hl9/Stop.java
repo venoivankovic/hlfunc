@@ -1,17 +1,42 @@
 package hl9;
 
+import java.util.ArrayList;
+
 public class Stop {
 
 	String stop_id;
 	String stop_code;
 	String stop_name;
+	String stop;
+	String town;
 	String stop_lat;
 	String stop_lon;
 	String stop_metadata;
 	double distance;
+	ArrayList<Stop> sameNameStops;
+	
+	public Stop() {
+		sameNameStops = new ArrayList<Stop>();
+	}
 	
 	public void setDistance(double distance) {
 		this.distance = distance;
+	}
+	
+	public void setStop(String stop) {
+		this.stop = stop;
+	}
+	
+	public void setTown(String town) {
+		this.town = town;
+	}
+	
+	public String getStop() {
+		return stop;
+	}
+	
+	public String getTown() {
+		return town;
 	}
 	
 	public double getDistance() {

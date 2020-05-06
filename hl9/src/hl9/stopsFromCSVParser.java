@@ -25,7 +25,7 @@ public class stopsFromCSVParser {
 	}
 	
 	public static ArrayList<Stop> firstParseStops() throws IOException{
-		String csvFile = "stops.csv";
+		String csvFile = "newstopsfull2.csv";
 	    BufferedReader br = null;
 	    String line = "";
 	    try {
@@ -41,11 +41,14 @@ public class stopsFromCSVParser {
 	    		stop.setStop_id(values[0]);
 	    		stop.setStop_code(values[1]);
 	    		stop.setStop_name(values[2]);
+	    		String [] arr = values[2].split(",");
+	    		stop.setTown(arr[0].substring(1));
+	    		stop.setStop(arr[1].substring(1, arr[1].length()-1));
 	    		stop.setStop_lat(values[3]);
 	    		stop.setStop_lon(values[4]);
 	    		stop.setStop_metadata(values[5]);
 	    		for (int i = 5; i < values.length; i++) {
-	    			stop.setStop_metadata(values[i]);
+	    			stop.appendStop_metadata(values[i]);
 				}
 	    		stops.add(stop);
 	    	}

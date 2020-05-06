@@ -76,21 +76,26 @@ public class ParsingJSON {
 		}
 	}
 	
-	public void parseTimingPointCodeString(String tpcString, String tpc) throws JSONException {
+	public void parseTimingPointCodeString(String tpcString, Stop stop) throws JSONException {
+		System.out.println(tpcString);
 		JSONObject fullResponse = new JSONObject(tpcString);
-		//System.out.println(fullResponse.toString());
-		JSONObject responseWithoutTcp = fullResponse.getJSONObject(tpc);
+		JSONObject responseWithoutTcp = fullResponse.getJSONObject(stop.getStop_code());
 		//System.out.println(responseWithoutTcp.toString());
 		JSONObject stationJSON = responseWithoutTcp.getJSONObject("Stop");
 		parseStationFromTpc(stationJSON);
 		JSONObject busesJSON = responseWithoutTcp.getJSONObject("Passes");
-		parseBusesFromTpc(busesJSON);
+		parseBusesFromTpc(busesJSON, stop);
 		JSONObject generalMessages = responseWithoutTcp.getJSONObject("GeneralMessages");
 		//System.out.println(generalMessages);
 	}
 	
-	public void parseBusesFromTpc(JSONObject busesJSON) throws JSONException {
+	public void parseBusesFromTpc(JSONObject busesJSON, Stop stop) throws JSONException {
 		JSONArray busNames = busesJSON.names();
+		if(busesJSON.toString().equals("{}")) {
+			System.out.println("No buses at this tpc");
+			return;
+		}
+		System.out.println(busesJSON.toString());
 		//System.out.println(busNames.get(0));
 		for (int i = 0; i < busNames.length(); i++) {
 			Bus bus = new Bus();
@@ -101,6 +106,7 @@ public class ParsingJSON {
 			bus.setFortifyOrderNumber(busJSON.getInt("FortifyOrderNumber"));
 			bus.setLatitude(busJSON.getDouble("Latitude"));
 			bus.setLongitude(busJSON.getDouble("Longitude"));
+			bus.set_destinationCode50(busJSON.getString("DestinationName50"));
 			bus.setTargetArrivalTime(busJSON.getString("TargetArrivalTime"));
 			bus.setTargetDepartureTime(busJSON.getString("TargetDepartureTime"));
 			bus.setTimingPointCode(busJSON.getString("TimingPointCode"));
@@ -111,12 +117,13 @@ public class ParsingJSON {
 			bus.setTimingStop(busJSON.getBoolean("IsTimingStop"));
 			bus.setLineName(busJSON.getString("LineName"));
 			bus.setLinePublicNumber(busJSON.getString("LinePublicNumber"));
+			bus.setStop(stop);
 			bus.setBus_metadata(busJSON.toString());
 			buses.add(bus);
 			//Collections.sort(buses);
 			//Collections.sort(buses.get(i).getExpectedArrivalTimeAsTime());
 		}
-		Collections.sort(buses);
+		//Collections.sort(buses);
 		//System.out.println(buses.size());
 		//System.out.println("here"+buses.get(0).getLongitude());
 	}

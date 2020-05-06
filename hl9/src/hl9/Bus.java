@@ -9,9 +9,10 @@ public class Bus implements Comparable<Bus> {
 	/*
 	 * time string format: 2020-03-05T06:27:00
 	 */
-
+	Stop stop;
 	String expectedArrivalTime;
 	String expectedDepartureTime;
+	String destinationCode50;
 	String lineName;
 	String linePublicNumber;
 	int fortifyOrderNumber;
@@ -40,6 +41,21 @@ public class Bus implements Comparable<Bus> {
 		// TODO Auto-generated constructor stub
 	}
 	
+	public void set_destinationCode50(String destinationCode50) {
+		this.destinationCode50 = destinationCode50;
+	}
+	
+	public String get_destinationCode50() {
+		return destinationCode50;
+	}
+	
+	public void setStop(Stop stop) {
+		this.stop = stop;
+	}
+	
+	public Stop getStop() {
+		return stop;
+	}
 	
 	public String getBusMetadata() {
 		return busMetadata;

@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Scanner;
 //import java.sql.Time;
 import java.time.LocalDateTime;
@@ -18,9 +19,11 @@ import java.time.temporal.ChronoUnit;
 import org.json.JSONException;
 
 public class Main {
-	static double LATITUDE = 52.3213251;
-	static double LONGITUDE = 4.9530824;
+	static double LATITUDE = 52.4052957;
+	static double LONGITUDE = 4.8883806;
 	static int N_OF_CLOSEST_STOPS = 100;
+	static int N_OF_STRING_STOPS = 100;
+	static int DUMMY_DISTANCE = 50000000;
 	static Person me;
 	ArrayList<Stop> stops;
 
@@ -28,10 +31,8 @@ public class Main {
 		me = new Person();
 		me.setLatitude(LATITUDE);
 		me.setLongitude(LONGITUDE);
-		//searchForStation();
-		//System.out.println(stops.size());
-		//System.out.println(stops.get(2043).stop_name);
-		showBusesOnStation();
+		searchForStation();
+		
 	}
 	
 	public static void searchForStation()throws IOException, InterruptedException, JSONException {
@@ -44,12 +45,15 @@ public class Main {
 		String s = sc.nextLine();
 		if(s.equals("s")) {
 			ArrayList<Stop> searchStringStops = getSearchStringStops(stops);
-			//some station selected
-			showBusesOnStation(); //some code sent in, either tpc or stopareacode
+			ArrayList<Stop> searchStringStopsReduced = reduceStops(searchStringStops);
+			Stop chosenStop = pickStation(searchStringStopsReduced);
+			searchForBus(chosenStop);
 		}
 		else if (s.equals("l")) {
 			ArrayList<Stop> closestStops = getNClosestStops(stops);
-			showBusesOnStation(); //some code sent in, either tpc or stopareacode
+			ArrayList<Stop> closestStopsReduced = reduceStops(closestStops);
+			Stop chosenStop = pickStation(closestStopsReduced);
+			searchForBus(chosenStop);
 		}
 		else {
 			System.out.println("End of program.");
@@ -57,20 +61,104 @@ public class Main {
 		}
 	}
 	
+	public static void searchForBus(Stop stop) throws IOException, InterruptedException, JSONException {
+		ArrayList<Bus> result = new ArrayList<Bus>();
+		ArrayList<Bus> buses = new ArrayList<Bus>();
+		buses = getBusesOnStation(stop); 
+		result.addAll(buses);
+		for (int i = 0; i < stop.sameNameStops.size(); i++) {
+			buses = getBusesOnStation(stop.sameNameStops.get(i));
+			result.addAll(buses);
+		}
+		Collections.sort(result);
+		pickABus(result);
+		
+	}
+	
+	public static ArrayList<Bus> getBusesOnStation(Stop stop) throws IOException, InterruptedException, JSONException {
+		System.out.println(stop.getStop_name() +" "+ stop.get_Latitude() +" "+ stop.get_Longitude()+" "+stop.getStop_code());
+		ParsingJSON parseTheJSON = new ParsingJSON();
+		String JSONtpcToParse = OVapi.doRequestByTimeCodePoint(stop.getStop_code());
+		if (JSONtpcToParse.equals("[]")) {
+			ArrayList<Bus> dummies = new ArrayList<Bus>();
+			return dummies;
+		}
+		//System.out.println(JSONtpcToParse);
+		parseTheJSON.parseTimingPointCodeString(JSONtpcToParse, stop);
+		//Station station = parseTheJSON.station; - station is stop returned by request, rarely it is erroneous, this is something to deal with in testing
+		ArrayList<Bus> buses = parseTheJSON.buses;
+		return buses;
+	}
+	
+	public static void pickABus(ArrayList<Bus> buses) throws IOException, InterruptedException, JSONException {
+		for (int i = 0; i < buses.size(); i++) {
+			Bus aBus = buses.get(i);
+			System.out.println(i +" #"+ aBus.getLinePublicNumber() +"  "+  aBus.get_destinationCode50() + "  "+ aBus.getExpectedDepartureTimeAsTimeString() +" "+ aBus.getStop().getStop_code());
+		}
+		System.out.println("\nPick my bus");
+		Scanner sc = new Scanner(System.in);
+		String s = sc.nextLine();
+		int result = Integer.parseInt(s);
+		Bus arbitrarilyChosenBus = buses.get(result);
+		getSelectedBusInfo(arbitrarilyChosenBus);
+		test(arbitrarilyChosenBus.getStop(),arbitrarilyChosenBus);
+	}
+	
+	
+	public static Stop pickStation(ArrayList<Stop> stations) {
+		System.out.println("\nPick a station (type its number)");
+		for (int i = 0; i < stations.size(); i++) {
+			System.out.println(i+" "+stations.get(i).getStop()+" "+stations.get(i).getTown());
+		}
+		Scanner sc = new Scanner(System.in);
+		String s = sc.nextLine();
+		int result = Integer.parseInt(s);	
+		Stop arbitrarilyChosenStop = stations.get(result);
+		return arbitrarilyChosenStop;
+	}
+	
+	public static ArrayList<Stop> reduceStops(ArrayList<Stop> stops){
+		ArrayList<Stop> result = new ArrayList<Stop>();
+		boolean newName;
+		for (int i = 0; i < stops.size(); i++) {
+			newName = true;
+			for (int j = 0; j < result.size(); j++) {
+				if (stops.get(i).getStop_name().equals(result.get(j).getStop_name())) {
+					result.get(j).sameNameStops.add(stops.get(i));
+					newName = false;
+				}
+			}
+			if (newName) {
+				result.add(stops.get(i));
+			}
+		}
+		return result;
+	}
+	
+	public static ArrayList<Stop> isStopNameInList(Stop stop, ArrayList<Stop> stops) {
+		for (int i = 0; i < stops.size(); i++) {
+			if (stops.get(i).getStop_name().equals(stop.getStop_name())) {
+				stops.get(i).sameNameStops.add(stop);
+				return stops;
+			}
+		}
+		return stops;
+	}
+	
+	
 	public static ArrayList<Stop> getSearchStringStops(ArrayList<Stop> parsedStops){
 		System.out.println("Please type in your search query (name of station):");
 		Scanner sc = new Scanner(System.in);
 		String query = sc.nextLine();
-		sc.close();
 		ArrayList<Stop> stops = new ArrayList<Stop>();
 		for (int i = 0; i < parsedStops.size(); i++) {
+			if (stops.size()>N_OF_STRING_STOPS) {
+				return stops;
+			}
 			Stop currentStop = parsedStops.get(i);		
 			if (containsIgnoreCase(currentStop.getStop_name(), query)) {
 				stops.add(currentStop);
 			}
-		}
-		for (int i = 0; i < stops.size(); i++) {
-			System.out.println(i+" "+stops.get(i).getStop_name());
 		}
 		return stops;
 	}
@@ -88,19 +176,16 @@ public class Main {
 	public static ArrayList<Stop> getNClosestStops(ArrayList<Stop> parsedStops) throws IOException {
 		ArrayList<Stop> stops = new ArrayList<Stop>();
 		Stop dummyStop = new Stop();
-		dummyStop.setDistance(50000000);
+		dummyStop.setDistance(DUMMY_DISTANCE);
 		for (int i = 0; i < N_OF_CLOSEST_STOPS; i++) {
 			stops.add(dummyStop);
 		}
 		double dist = 0;
 		for (int i = 0; i < parsedStops.size(); i++) { //For test run change this to 100
 			Stop currentStop = parsedStops.get(i);
-			//System.out.println(currentStop.getStop_name());
 			dist = distance(me.getLatitude(), me.getLongitude(), currentStop.get_Latitude(), currentStop.get_Longitude());
 			currentStop.setDistance(dist);
-			//System.out.println(currentStop.getStop_name()+" "+currentStop.getDistance());
 			Stop lastStop = stops.get(N_OF_CLOSEST_STOPS-1);
-			//System.out.println(lastStop.getStop_name()+" "+lastStop.getDistance());
 			if(dist<=lastStop.getDistance()) {
 				stops = getStops(currentStop, stops);
 			}
@@ -126,63 +211,15 @@ public class Main {
 		return stops;
 	}
 	
-	public static void getSelectedBusInfo(Station station,Bus bus) throws IOException, InterruptedException, JSONException {
-		//check and parse journey?
-		//after bus is selected
-		//call this every few secs
-		//test(station, bus);
+	public static void getSelectedBusInfo(Bus bus) throws IOException, InterruptedException, JSONException {
 		ParsingJSON parseTheJSON = new ParsingJSON();
 		System.out.println(bus.getDataOwnerCode()+"_"+ bus.getLocalServiceLevelCode()+"_"+bus.getLinePlanningNumber()+"_"+bus.getJourneyNumber()+"_"+bus.getFortifyOrderNumber());
 		String JSONjrnToParse = OVapi.doRequestByJourney(bus.getDataOwnerCode(), bus.getLocalServiceLevelCode(), bus.getLinePlanningNumber(), bus.getJourneyNumber(), bus.getFortifyOrderNumber());		
-		//System.out.println(JSONjrnToParse);
-		//System.out.println(JSONjrnToParse);
 		parseTheJSON.parseJourneyString(bus,JSONjrnToParse);
-		
 	}
 	
 	
-
-	public static void showBusesOnStation() throws IOException, InterruptedException, JSONException {
-		// Let's assume the user selected a bus station either through his GPS location
-		// or through search
-		// In both cases the timingPointCode of the station is returned
-		String tpc = "30000114";
-		ParsingJSON parseTheJSON = new ParsingJSON();
-		String JSONtpcToParse = OVapi.doRequestByTimeCodePoint(tpc);
-		System.out.println(JSONtpcToParse);
-		parseTheJSON.parseTimingPointCodeString(JSONtpcToParse, tpc);
-		Station station = parseTheJSON.station;
-		System.out.println(station.getTimingPointName() +" "+ station.getLatitude() +" "+ station.getLongitude());
-		ArrayList<Bus> buses = parseTheJSON.buses;
-		
-		for (int i = 0; i < buses.size(); i++) {
-			Bus aBus = buses.get(i);
-			System.out.println(i +" #"+ aBus.getLinePublicNumber() +"  "+  aBus.getLineName() + "  "+ aBus.getExpectedDepartureTimeAsTimeString());
-		}
-		System.out.println("\nPick my bus");
-		Scanner sc = new Scanner(System.in);
-		String s = sc.nextLine();
-		int result = Integer.parseInt(s);
-		
-		Bus arbitrarilyChosenBus = buses.get(result);
-		getSelectedBusInfo(station,arbitrarilyChosenBus);
-		/*
-		 * So at this point we have a station with some info (GPS is most important
-		 * here), we had that from the stops csv too but since the tpc request returns a
-		 * station it is included
-		 * 
-		 * We also have a much more useful arraylist of bus objects from which the user
-		 * would choose his bus
-		 */
-	}
-	
-	/*
-	 * Do request by journey after a bus is chosen every 15 seconds, i.e. call api request every 15 seconds
-	 */
-	
-	
-
-	public static void test(Station station, Bus bus) {
+	public static void test(Stop stop, Bus bus) {
 		Person me = new Person();
 		me.setLatitude(LATITUDE);
 		me.setLongitude(LONGITUDE);
@@ -190,7 +227,7 @@ public class Main {
 		//System.out.println(station.getLatitude());
 		//System.out.println(station.getLongitude());
 		
-		double dist = distance(me.getLatitude(), me.getLongitude(), station.getLatitude(), station.getLongitude());
+		double dist = distance(me.getLatitude(), me.getLongitude(), stop.get_Latitude(), stop.get_Longitude());
 		System.out.println("Distance between me and station is: "+dist+" meters");
 		
 		//System.out.println("Distance between bus and station is: " + distance(bus.getLatitude(), bus.getLongitude(), station.getLatitude(), station.getLongitude())+" meters");
